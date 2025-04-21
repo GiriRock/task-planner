@@ -8,9 +8,16 @@
 	<script src="./js/moment.min.js"></script>
 </head>
 
-<body>
-	<h1>Hello, world!</h1>
-
+<body hx-get="/tasks" hx-swap="outerHTML" hx-target="#tasks" hx-trigger="load">
+	<h1>Tasks!</h1>
+	<button hx-get="/tasks" hx-swap="outerHTML" hx-target="#tasks">Refresh</button>
+	{{ block "tasks" .}}
+	<div id="tasks">
+		{{ range . }}
+		{{ template "task" . }}
+		{{ end }}
+	</div>
+	{{ end }}
 	<script>
 		document.body.addEventListener('htmx:beforeSwap', function (evt) {
 			if (evt.detail.xhr.status === 404) {
@@ -37,3 +44,14 @@
 </html>
 
 {{end}}
+
+
+{{ block "task" .}}
+<div id="task">
+	<h2>{{ .Name}}</h2>
+	<p>{{ .Description }}</p>
+	<p>Due Date: {{ .DueDate }}</p>
+	<p>Completed: {{ .Completed }}</p>
+	<button hx-delete="/tasks?id={{ .ID }}" hx-swap="outerHTML">Delete</button>
+</div>
+{{ end }}

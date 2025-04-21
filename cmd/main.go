@@ -32,9 +32,10 @@ func main() {
 	e.GET("/", func(c echo.Context) error {
 		return c.Render(200, "index", nil)
 	})
-	e.GET("/test", func(c echo.Context) error {
-		return c.JSON(200, "test")
-	})
+	e.GET("/google-auth", handlers.CallGoogleOAuth)
 	e.GET("/tasks", handlers.GetTasks)
+	e.DELETE("/tasks", handlers.DeleteTask)
+	e.GET("/oauth/callback", handlers.GoogleOAuthCallback)
+	e.GET("/oauth2/callback", handlers.Callback)
 	e.Logger.Fatal(e.Start(":42069"))
 }
