@@ -3,6 +3,7 @@ package main
 import (
 	"html/template"
 	"io"
+	"net/http"
 
 	"github.com/girirock/task-planner/cmd/handlers"
 	"github.com/girirock/task-planner/cmd/models"
@@ -40,9 +41,14 @@ func main() {
 	//use the process middleware to check if the user is logged in
 	e.Use(handlers.CheckLoggedIn)
 	e.GET("/", func(c echo.Context) error {
+		accessToken, _ := c.Cookie("access_token")
+		User, err := handlers.DecodeAccessToken(accessToken.Value)
+		if err != nil {
+			return c.Redirect(http.StatusFound, "/google-auth")
+		}
 		userData := userData{
-			Name:    "test",
-			Picture: "https://lh3.googleusercontent.com/a/ACg8ocKVXnXqkwvp7C1GRQIyeGgHuisk2gr_7zMzNdaDhFK0wKSuYw=s96-c",
+			Name:    User.Name,
+			Picture: User.Picture,
 			Tasks:   []models.Task{},
 		}
 		return c.Render(200, "index", userData)
@@ -51,6 +57,6 @@ func main() {
 	e.GET("/tasks", handlers.GetTasks)
 	e.DELETE("/tasks", handlers.DeleteTask)
 	e.GET("/oauth/callback", handlers.GoogleOAuthCallback)
-	//e.GET("/oauth2/callback", handlers.Callback)
+	e.GET("/logout", handlers.Logout)
 	e.Logger.Fatal(e.Start(":42069"))
 }

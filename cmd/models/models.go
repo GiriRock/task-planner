@@ -9,4 +9,12 @@ type Task struct {
 	Description string        `bson:"description"`
 	DueDate     string        `bson:"dueDate"`
 	Completed   bool          `bson:"completed"`
+	UID         string        `bson:"uid"`
+}
+
+type User struct {
+	ID      bson.ObjectID `bson:"_id,omitempty"`
+	Name    string        `bson:"name"`
+	Picture string        `bson:"picture"`
+	UID     string        `bson:"uid"`
 }

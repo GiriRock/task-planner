@@ -3,8 +3,10 @@ package handlers
 import (
 	"fmt"
 	"log"
+	"net/http"
 	"net/url"
 	"os"
+	"regexp"
 
 	"github.com/girirock/task-planner/cmd/models"
 	"github.com/labstack/echo/v4"
@@ -20,11 +22,16 @@ func GetTasks(ctx echo.Context) error {
 		fmt.Sprintf("%v", os.Getenv("DB_CONN")))
 	client, err := mongo.Connect(clientOpts)
 	if err != nil {
-		log.Panic(err)
+		log.Fatal(err)
+	}
+	accessToken, _ := ctx.Cookie("access_token")
+	User, err := DecodeAccessToken(accessToken.Value)
+	if err != nil {
+		return ctx.Redirect(http.StatusFound, "/google-auth")
 	}
 
 	var tasks []models.Task
-	cur, err := client.Database("task-planner").Collection("tasks").Find(c, bson.M{})
+	cur, err := client.Database("task-planner").Collection("tasks").Find(c, bson.M{"uid": User.UID})
 	if err != nil {
 		return err
 	}
@@ -49,23 +56,45 @@ func DeleteTask(ctx echo.Context) error {
 	if err != nil {
 		return err
 	}
-	// remove string ObjectID from the id
-	println(decodedID)
-	_id, err := bson.ObjectIDFromHex(decodedID)
+	re := regexp.MustCompile(`ObjectID\("([a-f0-9]+)"\)`)
+	matches := re.FindStringSubmatch(decodedID)
+	println(matches[1])
+	_id, err := bson.ObjectIDFromHex(matches[1])
 	if err != nil {
-		log.Panic(err)
+		log.Fatal(err)
 	}
 	clientOpts := options.Client().ApplyURI(
 		fmt.Sprintf("%v", os.Getenv("DB_CONN")))
 	client, err := mongo.Connect(clientOpts)
 	if err != nil {
-		log.Panic(err)
+		log.Fatal(err)
 	}
 	defer client.Disconnect(c)
-	var decodedTask models.Task
-	task := client.Database("task-planner").Collection("tasks").FindOne(c, bson.M{"_id": _id})
-	task.Decode(&decodedTask)
-	fmt.Println(decodedTask)
-	//_, err = client.Database("task-planner").Collection("tasks").DeleteOne(c, bson.M{"_id": decodedID})
+	_, err = client.Database("task-planner").Collection("tasks").DeleteOne(c, bson.M{"_id": _id})
+	return GetTasks(ctx)
+}
+
+func AddTask(ctx echo.Context) error {
+	//TODO: implement add task
+	c := ctx.Request().Context()
+	clientOpts := options.Client().ApplyURI(
+		fmt.Sprintf("%v", os.Getenv("DB_CONN")))
+	client, err := mongo.Connect(clientOpts)
+	if err != nil {
+		log.Fatal(err)
+	}
+	accessToken, _ := ctx.Cookie("access_token")
+	User, err := DecodeAccessToken(accessToken.Value)
+	if err != nil {
+		return ctx.Redirect(http.StatusFound, "/google-auth")
+	}
+	var task models.Task
+	if err := ctx.Bind(&task); err != nil {
+		return err
+	}
+	task.UID = User.UID
+	task.Completed = false
+	defer client.Disconnect(c)
+	_, err = client.Database("task-planner").Collection("tasks").InsertOne(c, task)
 	return GetTasks(ctx)
 }
