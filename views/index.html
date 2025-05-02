@@ -9,9 +9,10 @@
 </head>
 
 <body hx-get="/tasks" hx-swap="outerHTML" hx-target="#tasks" hx-trigger="load">
+	{{ template "profile" . }}
 	<h1>Tasks!</h1>
 	<button hx-get="/tasks" hx-swap="outerHTML" hx-target="#tasks">Refresh</button>
-	{{ block "tasks" .}}
+	{{ block "tasks" .Tasks }}
 	<div id="tasks">
 		{{ range . }}
 		{{ template "task" . }}
@@ -54,4 +55,20 @@
 	<p>Completed: {{ .Completed }}</p>
 	<button hx-delete="/tasks?id={{ .ID }}" hx-swap="outerHTML">Delete</button>
 </div>
+{{ end }}
+
+{{ block "profile" .}}
+<nav style="padding:10px;">
+	{{ if .Name }}
+	<div style="display: flex;justify-content: end;gap: 10px;align-items: center;">
+		<img src="{{ .Picture }}" alt="Profile Picture" style="width: 50px;border-radius: 50px;">
+		<div style="display: flex;flex-direction: column;justify-content: center;">
+			<span style="font-size: 25px;text-transform: capitalize;"> {{ .Name }}</span>
+			<a href="/logout">Logout</a>
+		</div>
+		{{ else }}
+		<a href="/google-auth">Google Auth</a>
+		{{ end }}
+	</div>
+</nav>
 {{ end }}

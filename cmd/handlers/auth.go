@@ -12,6 +12,38 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
+func login(isGoogle bool, accessToken string) error {
+	if isGoogle {
+		//Call user info API with the access token as Bearer token
+		userReq, err := http.NewRequest("GET", "https://www.googleapis.com/oauth2/v3/userinfo", nil)
+		if err != nil {
+			return err
+		}
+		userReq.Header.Add("Authorization", fmt.Sprintf("Bearer %v", accessToken))
+		client := &http.Client{}
+		userResp, err := client.Do(userReq)
+		if err != nil {
+			return err
+		}
+		defer userResp.Body.Close()
+
+		// bodyBytes, err := io.ReadAll(userResp.Body)
+		// if err != nil {
+		// 	return err
+		// }
+		// fmt.Println(string(bodyBytes))
+
+		var userInfo map[string]interface{}
+		if err := json.NewDecoder(userResp.Body).Decode(&userInfo); err != nil {
+			return err
+		}
+		fmt.Println(userInfo["name"].(string))
+		fmt.Println(userInfo["sub"].(string))
+		fmt.Println(userInfo["picture"].(string))
+	}
+	return nil
+}
+
 func CallGoogleOAuth(ctx echo.Context) error {
 	// url := os.Getenv("GOOGLE_OAUTH_URL")
 	clientID := os.Getenv("GOOGLE_OAUTH_CLIENT_ID")
@@ -29,9 +61,9 @@ func GoogleOAuthCallback(ctx echo.Context) error {
 	// Prepare token request
 	requestData := url.Values{
 		"code":          {code[0]},
-		"client_id":     {os.Getenv("CLIENT_ID")},
-		"client_secret": {os.Getenv("CLIENT_SECRET")},
-		"redirect_uri":  {os.Getenv("REDIRECT_URI")},
+		"client_id":     {os.Getenv("GOOGLE_OAUTH_CLIENT_ID")},
+		"client_secret": {os.Getenv("GOOGLE_OAUTH_CLIENT_SECRET")},
+		"redirect_uri":  {os.Getenv("GOOGLE_OAUTH_REDIRECT_URL")},
 		"grant_type":    {"authorization_code"},
 	}
 
@@ -49,32 +81,33 @@ func GoogleOAuthCallback(ctx echo.Context) error {
 	}
 	defer resp.Body.Close()
 
-	var result map[string]interface{}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	var tokenInfo map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&tokenInfo); err != nil {
 		return err
 	}
 
 	// Call user info API with the access token as Bearer token
-	userReq, err := http.NewRequest("GET", "https://www.googleapis.com/oauth2/v3/userinfo", nil)
-	if err != nil {
-		return err
-	}
-	userReq.Header.Add("Authorization", fmt.Sprintf("Bearer %v", result["access_token"]))
-
-	userResp, err := client.Do(userReq)
-	if err != nil {
-		return err
-	}
-	defer userResp.Body.Close()
-
-	var userInfo map[string]interface{}
-	if err := json.NewDecoder(userResp.Body).Decode(&userInfo); err != nil {
-		return err
-	}
-
+	// userReq, err := http.NewRequest("GET", "https://www.googleapis.com/oauth2/v3/userinfo", nil)
+	// if err != nil {
+	// 	return err
+	// }
+	// userReq.Header.Add("Authorization", fmt.Sprintf("Bearer %v", result["access_token"]))
+	//
+	// userResp, err := client.Do(userReq)
+	// if err != nil {
+	// 	return err
+	// }
+	// defer userResp.Body.Close()
+	//
+	// var userInfo map[string]interface{}
+	// if err := json.NewDecoder(userResp.Body).Decode(&userInfo); err != nil {
+	// 	return err
+	// }
+	//
+	login(true, tokenInfo["access_token"].(string))
 	cookie := &http.Cookie{
 		Name:    "access_token",
-		Value:   result["access_token"].(string),
+		Value:   tokenInfo["access_token"].(string),
 		Path:    "/",
 		Expires: time.Now().Add(365 * 24 * time.Hour),
 		Secure:  true,
@@ -85,7 +118,25 @@ func GoogleOAuthCallback(ctx echo.Context) error {
 	return ctx.Redirect(http.StatusFound, "/")
 }
 
-func Callback(ctx echo.Context) error {
-	// TODO: Implement
-	return ctx.JSON(200, "test")
+func GenerateAccessToken(ctx echo.Context) error {
+	// TODO: Generate access token for the user
+	return ctx.Redirect(http.StatusFound, "/")
+}
+
+// Middleware to check if the user is logged in
+func CheckLoggedIn(next echo.HandlerFunc) echo.HandlerFunc {
+	return func(ctx echo.Context) error {
+		if ctx.Request().URL.Path == "/oauth/callback" {
+			return next(ctx)
+		}
+		if ctx.Request().URL.Path == "/google-auth" {
+			return next(ctx)
+		}
+		_, err := ctx.Cookie("access_token")
+		// TODO: Check if the user is logged in is valid (check if the token is still valid)
+		if err != nil {
+			return ctx.Redirect(http.StatusFound, "/google-auth")
+		}
+		return next(ctx)
+	}
 }
